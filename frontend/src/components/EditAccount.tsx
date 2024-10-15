@@ -12,25 +12,21 @@ export default function EditAccount() {
     const [userData, setUserData] = useState({
         username: '',
         email: '',
+        avatar: '', 
     });
     const [originalUserData, setOriginalUserData] = useState({
         username: '',
         email: '',
+        avatar: '',
     });
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [isEditing, setIsEditing] = useState(false);
-    const [showPassword, setShowPassword] = useState(false)
-    const [errors, setErrors] = useState<{
-        username?: string;
-        currentPassword?: string;
-        newPassword?: string;
-    }>({
-        username: undefined,
-        currentPassword: undefined,
-        newPassword: undefined,
-    });
+    const [showPassword, setShowPassword] = useState(false);
+    const [errors, setErrors] = useState<Errors>({});
     const [showModal, setShowModal] = useState(false);
+    const [avatarFile, setAvatarFile] = useState<File | null>(null); // File to upload
+    const [avatarPreview, setAvatarPreview] = useState(''); // Preview of the avatar
 
     useEffect(() => {
         // Fetch current user details
@@ -42,12 +38,15 @@ export default function EditAccount() {
                 setUserData({
                     username: response.data.user.username,
                     email: response.data.user.email,
+                    avatar: response.data.user.avatar || "https://via.placeholder.com/200x200", // Default avatar
                 });
                 // Also save the original data for cancel functionality
                 setOriginalUserData({
                     username: response.data.user.username,
                     email: response.data.user.email,
+                    avatar: response.data.user.avatar || "https://via.placeholder.com/200x200",
                 });
+                setAvatarPreview(response.data.user.avatar || "https://via.placeholder.com/200x200"); // initial avatar preview
             } catch (err) {
                 console.error(err);
             }
@@ -83,41 +82,75 @@ export default function EditAccount() {
         setUserData(originalUserData);
         setCurrentPassword('');
         setNewPassword('');
+        setAvatarFile(null); // Clear avatar file
+        setAvatarPreview(originalUserData.avatar); // Reset avatar preview
         setErrors({});
+    };
+
+    const handleAvatarRemove = () => {
+        setAvatarPreview('https://via.placeholder.com/200x200');
+    };
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setAvatarFile(file);
+
+            // Preview the avatar image
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setAvatarPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file); // Convert file to base64 string
+        }
     };
 
     const handleSaveChanges = async () => {
         if (!validateInputs()) return;
 
         try {
-            const requestData = {
+            // Use FormData to handle file uploads and regular form data
+            const formData = new FormData();
+
+            // Append the standard form data
+            formData.append('username', userData.username);
+            formData.append('email', userData.email);
+            formData.append('currentPassword', currentPassword);
+            if (newPassword) formData.append('newPassword', newPassword);
+
+            // If the user uploaded a new avatar, append the file
+            if (avatarFile) {
+                formData.append('avatar', avatarFile);
+            }
+
+            console.log('Sending update request with formData');
+
+            const response = await axios.put(`${baseUrl}/api/edit-account`, formData, {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'multipart/form-data', // Important for file uploads
+                },
+            });
+
+            
+            // Update originalUserData with the new values after successful update
+            setOriginalUserData({
                 username: userData.username,
                 email: userData.email,
-                currentPassword,
-                newPassword,
-            };
+                avatar: avatarPreview,
+            });
 
-            console.log('Sending update request with data:', requestData);
-
-            const response = await axios.put(
-                `${baseUrl}/api/edit-account`,
-                requestData,
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
 
             console.log(response.data.message);
+
+            localStorage.setItem('username', userData.username);
             setShowModal(true); // Show the modal on successful update
             setIsEditing(false);
         } catch (err) {
             console.error(err);
             setErrors((prev) => ({
                 ...prev,
-                currentPassword: 'Incorrect current password', 
+                currentPassword: 'Incorrect current password',
             }));
         }
     };
@@ -172,52 +205,87 @@ export default function EditAccount() {
 
                         <div className="flex items-center">
                             <input
-                            id="show-password"
-                            name="show-password"
-                            type="checkbox"
-                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                            checked={showPassword}
-                            onChange={() => setShowPassword(!showPassword)}
+                                id="show-password"
+                                name="show-password"
+                                type="checkbox"
+                                className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                checked={showPassword}
+                                onChange={() => setShowPassword(!showPassword)}
                             />
                             <label htmlFor="show-password" className="ml-2 block text-sm text-gray-900">
-                            Show password
+                                Show password
                             </label>
+                        </div>
+
+                        {/* Avatar Upload */}
+                        <div className="relative inline-block">
+                          <label className="absolute top-2 left-2 text-sm font-medium text-white bg-gray-700 bg-opacity-70 px-2 py-1 rounded">Avatar:</label>
+                        <img
+                            className="w-48 h-48 p-2 border"
+                            src={
+                                avatarPreview.startsWith("http://localhost:5000") || avatarPreview.startsWith("data:image")
+                                ? avatarPreview
+                                : avatarPreview === "https://via.placeholder.com/200x200"
+                                ? "https://via.placeholder.com/200x200"
+                                : `http://localhost:5000${avatarPreview}`
+                            }
+                            alt="Avatar placeholder"
+                        />
+
+                            <input
+                                type="file"
+                                id="avatar-upload"
+                                className="hidden"
+                                onChange={handleAvatarChange}
+                            />
+
+                            <label
+                                htmlFor="avatar-upload"
+                                className="mt-1 mr-4 inline-block py-2 px-4 bg-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-400 transition duration-200 cursor-pointer"
+                            >
+                                Upload
+                            </label>
+                            <button 
+                                className="mt-1 inline-block py-2 px-4 bg-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-400 transition duration-200 cursor-pointer"
+                                onClick={handleAvatarRemove}
+                            >
+                                Remove 
+                            </button>
                         </div>
                     </>
                 )}
-            </div>
 
-            <div className="mt-6 flex justify-between">
-                {!isEditing ? (
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        className="py-2 w-full bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-200"
-                    >
-                        Edit
-                    </button>
-                ) : (
-                    <>
+                {isEditing ? (
+                    <div className="flex space-x-4 mt-4">
                         <button
                             onClick={handleSaveChanges}
-                            className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition duration-200"
+                            className="py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
                         >
                             Save Changes
                         </button>
                         <button
-                           onClick={() => {
-                            setIsEditing(false);
-                            cancelChanges();}}
-                            className="py-2 px-4 bg-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-400 transition duration-200"
+                                onClick={() => {
+                                setIsEditing(false);
+                                cancelChanges();
+                                }}
+                            className="py-2 px-4 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition duration-200"
                         >
                             Cancel
                         </button>
-                    </>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => setIsEditing(true)}
+                        className="w-full py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-200"
+                    >
+                        Edit Account
+                    </button>
                 )}
             </div>
 
-            {/* Modal for Success */}
+            {/* Success Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+             <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
                     <div className="bg-white p-6 rounded-lg shadow-lg">
                         <h3 className="text-xl font-bold mb-4">Success!</h3>
                         <p>Your account has been updated successfully.</p>

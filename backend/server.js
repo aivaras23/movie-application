@@ -4,11 +4,14 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const multer = require('multer');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -17,6 +20,19 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
 });
+
+// Configure multer to save files locally
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/avatars'); // Folder where avatars will be stored
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname)); // Save with unique name
+    }
+});
+const upload = multer({ storage: storage });
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -196,7 +212,7 @@ app.get('/api/edit-account', verifyToken, async (req, res) => {
     const userId = req.user.userId;
 
     try {
-        const user = await pool.query('SELECT username, email FROM users WHERE id = $1', [userId]);
+        const user = await pool.query('SELECT username, email, avatar FROM users WHERE id = $1', [userId]);
 
         if (user.rows.length === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
@@ -206,7 +222,8 @@ app.get('/api/edit-account', verifyToken, async (req, res) => {
             success: true,
             user: {
                 username: user.rows[0].username,
-                email: user.rows[0].email
+                email: user.rows[0].email,
+                avatar: user.rows[0].avatar,
             }
         });
     } catch (err) {
@@ -215,31 +232,20 @@ app.get('/api/edit-account', verifyToken, async (req, res) => {
     }
 });
 
-// Edit account (PUT request)
-app.put('/api/edit-account', verifyToken, async (req, res) => {
-    console.log("Request body:", req.body);
-
-    // Extract userId from JWT
+// Edit account endpoint
+app.put('/api/edit-account', verifyToken, upload.single('avatar'), async (req, res) => {
     const userId = req.user.userId;
     const { username, email, currentPassword, newPassword } = req.body;
-
-    console.log('Current password from client:', currentPassword);
+    const avatar = req.file ? `/uploads/avatars/${req.file.filename}` : null; // Avatar file path
 
     try {
         // Fetch the user by ID from the database
-        const user = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
-
-        if (user.rows.length === 0) {
+        const userQuery = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+        if (userQuery.rows.length === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        const dbPassword = user.rows[0].password;
-        console.log('Password from DB:', dbPassword);
-
-        // Ensure the current password is provided
-        if (!dbPassword || !currentPassword) {
-            return res.status(400).json({ success: false, message: 'Current password is required' });
-        }
+        const dbPassword = userQuery.rows[0].password;
 
         // Verify current password
         const validPassword = await bcrypt.compare(currentPassword, dbPassword);
@@ -253,13 +259,13 @@ app.put('/api/edit-account', verifyToken, async (req, res) => {
             updatedPassword = await bcrypt.hash(newPassword, 10);
         }
 
-        // Update username, email, and password in the database
+        // Update user information in the database
         await pool.query(
-            'UPDATE users SET username = $1, email = $2, password = $3 WHERE id = $4',
-            [username || user.rows[0].username, email || user.rows[0].email, updatedPassword, userId]
+            'UPDATE users SET username = $1, email = $2, password = $3, avatar = $4 WHERE id = $5',
+            [username || userQuery.rows[0].username, email || userQuery.rows[0].email, updatedPassword, avatar, userId]
         );
 
-        res.json({ success: true, message: 'Account updated successfully' });
+        res.json({ success: true, message: 'Account updated successfully', avatar });
     } catch (err) {
         console.error('Error updating account:', err);
         res.status(500).json({ success: false, message: 'Error updating account' });
