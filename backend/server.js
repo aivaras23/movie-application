@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
+const axios = require('axios')
 require('dotenv').config();
 
 const app = express();
@@ -271,6 +272,35 @@ app.put('/api/edit-account', verifyToken, upload.single('avatar'), async (req, r
         res.status(500).json({ success: false, message: 'Error updating account' });
     }
 });
+
+
+// Movies OMDB API
+const getAllMovies = async (req, res) => {
+    try {
+        const apiKey = process.env.OMDB_API_KEY;
+        const searchQuery = req.query.search || 'batman'; // Default search query
+        const response = await axios.get(`http://www.omdbapi.com/?s=${searchQuery}&apikey=${apiKey}`);
+
+        if (response.data.Response === "True") {
+            const movieDetails = await Promise.all(
+                response.data.Search.map(async (movie) => {
+                    const detailedResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdbID}&apikey=${apiKey}`);
+                    return detailedResponse.data; // Return detailed movie data
+                })
+            );
+            res.status(200).json(movieDetails);
+        } else {
+            res.status(404).json({ message: response.data.Error });
+        }
+    } catch (error) {
+        console.error('Error fetching data from OMDB API:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+
+// Route for fetching movies
+app.get('/api/home', getAllMovies);
 
 
 
