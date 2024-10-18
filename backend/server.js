@@ -274,23 +274,39 @@ app.put('/api/edit-account', verifyToken, upload.single('avatar'), async (req, r
 });
 
 
-// Movies OMDB API
 const getAllMovies = async (req, res) => {
     try {
         const apiKey = process.env.OMDB_API_KEY;
-        const searchQuery = req.query.search || 'batman'; // Default search query
-        const response = await axios.get(`http://www.omdbapi.com/?s=${searchQuery}&apikey=${apiKey}`);
 
-        if (response.data.Response === "True") {
-            const movieDetails = await Promise.all(
-                response.data.Search.map(async (movie) => {
-                    const detailedResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdbID}&apikey=${apiKey}`);
-                    return detailedResponse.data; // Return detailed movie data
-                })
-            );
-            res.status(200).json(movieDetails);
+        // Default search queries: harry potter, batman, superman, evil dead
+        const searchQueries = req.query.search
+            ? [req.query.search]
+            : ['harry potter', 'superman', 'avengers', 'evil dead'];
+
+        let allMovies = [];
+
+        // Loop through each query and get 5 movies
+        for (const query of searchQueries) {
+            const response = await axios.get(`http://www.omdbapi.com/?s=${query}&apikey=${apiKey}`);
+
+            if (response.data.Response === "True") {
+                const movieDetails = await Promise.all(
+                    response.data.Search.slice(0, 5).map(async (movie) => { // Limit to 5 results per query
+                        const detailedResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdbID}&apikey=${apiKey}`);
+                        return detailedResponse.data; // Return detailed movie data
+                    })
+                );
+                allMovies = allMovies.concat(movieDetails); // Combine the movies
+            } else {
+                console.error(`Error fetching movies for query "${query}": ${response.data.Error}`);
+            }
+        }
+
+        // Check if any movies were found
+        if (allMovies.length > 0) {
+            res.status(200).json(allMovies);
         } else {
-            res.status(404).json({ message: response.data.Error });
+            res.status(404).json({ message: 'No movies found for the given queries.' });
         }
     } catch (error) {
         console.error('Error fetching data from OMDB API:', error);
@@ -299,8 +315,11 @@ const getAllMovies = async (req, res) => {
 };
 
 
+
 // Route for fetching movies
 app.get('/api/home', getAllMovies);
+
+
 
 
 
