@@ -8,6 +8,7 @@ import ResetPassword from './components/ResetPassword'
 import VerifyEmail from './components/VerifyEmail'
 import ProtectedRoute from './components/ProtectedRoute'
 import EditAccount from './components/EditAccount'
+import MovieDetails from './pages/MovieDetails'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/home" element={<Home />} />
+          <Route path="/movie/:imdbID" element={<MovieDetails/>} />
         </Route>
       </Routes>
     </Router>

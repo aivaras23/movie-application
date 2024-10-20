@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface Movie {
     Title: string;
@@ -25,7 +26,7 @@ export default function Home() {
   const [sortCriterion, setSortCriterion] = useState<'Year' | 'imdbRating' | 'Title'>('Title');
 
 
-  const [selectedPoster, setSelectedPoster] = useState<string | null>(null);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null); // hold selected movie data
 
 
   const toggleShowMore = (imdbID: string) => {
@@ -82,13 +83,13 @@ export default function Home() {
     }, [sortDirection, sortCriterion]);
 
 
-const handlePosterClick = (posterUrl: string) => {
-    setSelectedPoster(posterUrl);
-};
+ const handlePosterClick = (movie: Movie) => {
+    setSelectedMovie(movie); // Set the whole movie object as selected
+  };
 
-const closeModal = () => {
-    setSelectedPoster(null);
-};
+  const closeModal = () => {
+    setSelectedMovie(null); // Close the modal
+  };
 
 
 
@@ -178,7 +179,7 @@ const closeModal = () => {
                    src={movie.Poster !== "N/A" ? movie.Poster : "https://via.placeholder.com/300x450?text=No+Image+Available"}
                     alt={movie.Title}
                   className="w-full h-64 object-cover"
-                   onClick={() => handlePosterClick(movie.Poster)}
+                   onClick={() => handlePosterClick(movie)}
                 />
                 <div className="p-4 text-white">
                   <h3 className="text-xl font-semibold mb-2">{movie.Title}</h3>
@@ -205,9 +206,12 @@ const closeModal = () => {
           </div>
         </div>
               
-              {selectedPoster && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75" onClick={closeModal}>
-                    <div className="relative">
+              {selectedMovie && (
+                movies.map((movie) => (
+                <div
+                  key={movie.imdbID}
+                  className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75" onClick={closeModal}>
+                    <div className="relative bg-gradient-to-br from-indigo-200 to-purple-400 p-4 rounded-md">
                       <button
                         onClick={closeModal}
                         className="absolute  w-12 top-0 right-2 m-3 text-3xl text-white bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-full hover:from-indigo-600 hover:to-purple-700 transition-colors duration-300 shadow-lg"
@@ -215,26 +219,22 @@ const closeModal = () => {
                         &times;
                       </button>
                       <img
-                        src={selectedPoster}
+                        src={selectedMovie.Poster}
                         alt="Movie Poster"
                         className="max-w-full max-h-screen"
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex justify-center space-x-1 mt-4">
-                        <button
-                          className="px-6 py-3 text-white bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg font-semibold shadow-md hover:from-indigo-600 hover:to-purple-700 transition-all duration-300"
-                        >
-                          Play Now
-                        </button>
-                        <button
-                          className="px-6 py-3 text-white bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg font-semibold shadow-md hover:from-indigo-500 hover:to-purple-600 transition-all duration-300"
-                        >
-                          + Add to Watchlist
-                        </button>
+              
+                        <Link to={`/movie/${selectedMovie.imdbID}`}>
+                          <button className="px-6 py-3 text-white bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg font-semibold shadow-md hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 w-64">
+                            View movie
+                          </button>
+                      </Link>
                       </div>
                     </div>
                 </div>
-
+                 ))
             )}
 
     </div>

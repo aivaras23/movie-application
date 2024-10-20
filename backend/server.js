@@ -273,6 +273,27 @@ app.put('/api/edit-account', verifyToken, upload.single('avatar'), async (req, r
     }
 });
 
+app.get('/api/movie/:imdbID', async (req, res) => {
+    const { imdbID } = req.params;
+    const apiKey = process.env.OMDB_API_KEY;
+
+    try {
+        // Make a request to OMDB API using the imdbID
+        const response = await axios.get(`http://www.omdbapi.com/?i=${imdbID}&apikey=${apiKey}`);
+
+        if (response.data.Response === "True") {
+            // Return the movie details if found
+            res.status(200).json(response.data);
+        } else {
+            // If the movie is not found, return a 404 status
+            res.status(404).json({ message: 'Movie not found' });
+        }
+    } catch (error) {
+        console.error('Error fetching data from OMDB API:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+})
+
 
 const getAllMovies = async (req, res) => {
     try {
