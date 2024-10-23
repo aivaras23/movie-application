@@ -107,6 +107,14 @@ export default function LoginForm() {
             >
               Sign in
             </button>
+            <span className='w-full flex justify-center'>or</span>
+            <a 
+              href="/home"
+              className='group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-800 hover:bg-green-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+              onClick={() => localStorage.setItem('guest', 'true')}
+            >
+              Continue as a guest
+            </a>
           </div>
         </form>
         {error && <p className="mt-2 text-center text-sm text-red-600">{error}</p>}

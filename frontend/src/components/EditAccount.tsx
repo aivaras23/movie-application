@@ -8,6 +8,19 @@ type Errors = {
     newPassword?: string;
 };
 
+interface Movie {
+    Title: string;
+    Year: string;
+    imdbID: string;
+    Type: string;
+    Poster: string;
+    Genre: string,
+    Plot: string,
+    Director: string,
+    Actors: string,
+    imdbRating: string
+}
+
 export default function EditAccount() {
     const [userData, setUserData] = useState({
         username: '',
@@ -27,6 +40,8 @@ export default function EditAccount() {
     const [showModal, setShowModal] = useState(false);
     const [avatarFile, setAvatarFile] = useState<File | null>(null); // File to upload
     const [avatarPreview, setAvatarPreview] = useState(''); // Preview of the avatar
+    const [showWatchList, setShowWatchlist] = useState(false);
+    const [watchlist, setWatchlist] = useState<Movie[]>([]);
 
     useEffect(() => {
         // Fetch current user details
@@ -154,6 +169,21 @@ export default function EditAccount() {
             }));
         }
     };
+
+
+    useEffect(() => {
+    const storedFavorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+    setWatchlist(storedFavorites);
+  }, []);
+
+  const handleClearWatchlist = () => {
+    localStorage.removeItem('favorites');
+    setWatchlist([]);
+  };
+  
+  const handleRemoveFromWatchlist = (imdbID: string) => {
+  setWatchlist((prevWatchlist) => prevWatchlist.filter((movie) => movie.imdbID !== imdbID));
+};
 
     return (
         <div className="max-w-lg mx-auto mt-10 p-6 bg-white rounded-lg shadow-lg">
@@ -299,13 +329,61 @@ export default function EditAccount() {
                 </div>
             )}
 
+            {showWatchList && (
+                <div className="bg-white rounded-lg p-6 shadow-lg max-w-md mx-auto">
+                    <h2 className="text-xl font-bold mb-4 text-indigo-600">Watchlist</h2>
+                    {watchlist.length === 0 ? (
+                    <p className="text-gray-600">Your watchlist is empty.</p>
+                    ) : (
+                    <ul className="space-y-4">
+                        {watchlist.map((movie) => (
+                        <li key={movie.imdbID} className="flex justify-between items-center bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-lg shadow-md">
+                            <div className="flex items-center space-x-4">
+                            <img src={movie.Poster} alt={movie.Title} width="50" className="rounded" />
+                            <span className="text-white font-semibold">{movie.Title}</span>
+                            </div>
+                            <button
+                            onClick={() => handleRemoveFromWatchlist(movie.imdbID)}
+                            className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded-lg shadow"
+                            >
+                            Delete
+                            </button>
+                        </li>
+                        ))}
+                    </ul>
+                    )}
+                    <div className="mt-4 flex justify-between">
+                    <button
+                        onClick={handleClearWatchlist}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-md transition"
+                    >
+                        Clear Watchlist
+                    </button>
+                    <button
+                        onClick={() => setShowWatchlist(false)}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-md transition"
+                    >
+                        Close
+                    </button>
+                    </div>
+                </div>
+                )}
+
             {!isEditing && (
+            <div>
+                <button
+                    className="w-full mt-4 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    onClick={() => setShowWatchlist(true)}
+                >
+                    My Watchlist
+                </button>
                 <button
                     onClick={() => (window.location.href = '/home')}
                     className=" mt-2 py-2 w-full bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition duration-200"
                 >
                     Home page
                 </button>
+            </div>
             )}
         </div>
     );

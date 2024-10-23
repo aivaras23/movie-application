@@ -15,7 +15,8 @@ interface Movie {
 }
 
 export default function Home() {
-  const username = localStorage.getItem('username')
+  const username = localStorage.getItem('guest') === 'true' ? 'Guest' : localStorage.getItem('username');
+  const [isLogged, setIsLogged] = useState(false);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [searchTerm, setSearchTerm] = useState(''); // For search input
   const [expandedMovies, setExpandedMovies] = useState<{ [key: string]: boolean }>({}); // for movie plot paragraphs 
@@ -28,6 +29,15 @@ export default function Home() {
 
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null); // hold selected movie data
 
+
+    useEffect(() => {
+    // Set login status based on whether a token exists and user is not a guest
+    const token = localStorage.getItem('token');
+    const guest = localStorage.getItem('guest');
+    if (token || guest === 'false') {
+      setIsLogged(true);
+    }
+  }, []);
 
   const toggleShowMore = (imdbID: string) => {
     setExpandedMovies((prev) => ({
@@ -96,72 +106,101 @@ export default function Home() {
   return (
     <div className='bg-indigo-100'>
       <header className="w-full bg-gradient-to-br from-blue-500 to-purple-600 p-6">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-4xl font-bold text-white">
-            Welcome, {username}!
-          </h1>
-          <div className="flex gap-5">
+  <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+    <h1 className="text-2xl md:text-4xl font-bold text-white text-center md:text-left">
+      Welcome, {username}!
+    </h1>
+    <div className="flex flex-col md:flex-row gap-3 md:gap-5 w-full md:w-auto items-center">
+      {isLogged ? (
+        <>
           <button
             onClick={() => {
-              localStorage.removeItem('token')
-              localStorage.removeItem('userId')
-              localStorage.removeItem('username')
-              localStorage.removeItem('email')
-              window.location.href = '/login'
+              localStorage.removeItem('token');
+              localStorage.removeItem('userId');
+              localStorage.removeItem('username');
+              localStorage.removeItem('email');
+              localStorage.removeItem('guest'); // Also remove guest status
+              window.location.href = '/login';
             }}
-            className="py-2 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition duration-200"
+            className="w-full md:w-auto py-2 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition duration-200 text-center"
           >
             Logout
           </button>
           <button
-              onClick={() => (window.location.href = '/edit-account')}
-              className="py-2 px-6 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition duration-200">
-           Account
+            onClick={() => (window.location.href = '/edit-account')}
+            className="w-full md:w-auto py-2 px-6 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition duration-200 text-center"
+          >
+            Account
           </button>
-          </div>
-        </div>
-      </header>
+        </>
+      ) : (
+        <>
+          <button
+            onClick={() => {
+              localStorage.removeItem('guest');
+              window.location.href = '/login'}}
+            className="w-full md:w-auto py-2 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-200 text-center"
+          >
+            Sign in
+          </button>
+          <button
+            onClick={() => {
+              localStorage.removeItem('guest')
+              window.location.href = '/register'}
+            }
+            className="w-full md:w-auto py-2 px-6 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition duration-200 text-center"
+          >
+            Sign up
+          </button>
+        </>
+      )}
+    </div>
+  </div>
+</header>
 
-          <div className="flex space-x-4 items-center bg-indigo-100 p-4 rounded-lg shadow-md">
-                <select
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                >
-                    <option value="">All</option>
-                    <option value="Movies">Movies</option>
-                    <option value="TV Shows">TV Shows</option>
-                </select>
-                <input
-                    type="text"
-                    placeholder="Search for movies..."
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-grow bg-indigo-50 text-indigo-900 placeholder-indigo-400 px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow-sm"
-                />
-                <div className="flex items-center space-x-2">
-                    <select
-                        onChange={(e) => setSortCriterion(e.target.value as 'Year' | 'imdbRating' | 'Title')}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-md"
-                    >
-                        <option value="Title">Title</option>
-                        <option value="Year">Year</option>
-                        <option value="imdbRating">IMDb Rating</option>
-                    </select>
+<div className="flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0 items-start md:items-center bg-indigo-100 p-4 rounded-lg shadow-md">
+    <select
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="bg-indigo-600 text-white px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full md:w-auto"
+    >
+        <option value="">All</option>
+        <option value="Movies">Movies</option>
+        <option value="TV Shows">TV Shows</option>
+    </select>
 
-                    <button
-                        onClick={() => setSortDirection('asc')}
-                        className={`py-2 px-4 rounded-md ${sortDirection === 'asc' ? 'bg-indigo-500' : 'bg-gray-300'} text-white`}
-                    >
-                        Ascending
-                    </button>
-                    <button
-                        onClick={() => setSortDirection('desc')}
-                        className={`py-2 px-4 rounded-md ${sortDirection === 'desc' ? 'bg-indigo-500' : 'bg-gray-300'} text-white`}
-                    >
-                        Descending
-                    </button>
-                </div>
+    <input
+        type="text"
+        placeholder="Search for movies..."
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="flex-grow bg-indigo-50 text-indigo-900 placeholder-indigo-400 px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow-sm w-full md:w-auto"
+    />
 
-          </div>
+      <div className="flex flex-col md:flex-row items-start md:items-center space-y-2 md:space-y-0 md:space-x-2">
+          <select
+              onChange={(e) => setSortCriterion(e.target.value as 'Year' | 'imdbRating' | 'Title')}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md w-full md:w-auto"
+          >
+              <option value="Title">Title</option>
+              <option value="Year">Year</option>
+              <option value="imdbRating">IMDb Rating</option>
+          </select>
+
+          <button
+              onClick={() => setSortDirection('asc')}
+              className={`py-2 px-4 rounded-md w-full md:w-auto ${sortDirection === 'asc' ? 'bg-indigo-500' : 'bg-gray-300'} text-white`}
+          >
+              Ascending
+          </button>
+
+          <button
+              onClick={() => setSortDirection('desc')}
+              className={`py-2 px-4 rounded-md w-full md:w-auto ${sortDirection === 'desc' ? 'bg-indigo-500' : 'bg-gray-300'} text-white`}
+          >
+              Descending
+          </button>
+      </div>
+  </div>
+
           <div className='flex justify-center items-center mx-auto bg-indigo-100 p-4 rounded-lg shadow-md '>
               <h1 className='text-center text-indigo-900 font-semibold text-2xl'>Our recommended movies</h1>
           </div>
