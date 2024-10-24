@@ -341,8 +341,282 @@ const getAllMovies = async (req, res) => {
 app.get('/api/home', getAllMovies);
 
 
-// save to 
+// Save favorite movie for the logged-in user
+app.post('/api/favorites', verifyToken, async (req, res) => {
+    const { imdbID, title, poster } = req.body;
+    const userId = req.user.userId;
 
+    try {
+        const favoriteExists = await pool.query(
+            'SELECT * FROM user_favorites WHERE user_id = $1 AND imdb_id = $2',
+            [userId, imdbID]
+        );
+
+        if (favoriteExists.rows.length > 0) {
+            return res.status(400).json({ message: 'Movie is already in your watchlist' });
+        }
+
+        await pool.query(
+            'INSERT INTO user_favorites (user_id, imdb_id, title, poster) VALUES ($1, $2, $3, $4)',
+            [userId, imdbID, title, poster]
+        );
+
+        res.json({ message: `${title} added to your watchlist!` });
+    } catch (error) {
+        console.error('Error adding movie to watchlist:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.get('/api/favorites', verifyToken, async (req, res) => {
+    const userId = req.user.userId;
+
+    try {
+        const result = await pool.query('SELECT imdb_id AS "imdbID", title, poster FROM user_favorites WHERE user_id = $1', [userId]);
+        res.json({ favorites: result.rows });
+    } catch (error) {
+        console.error('Error fetching user favorites:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
+// Route to clear all favorite movies from the user's watchlist
+app.delete('/api/favorites/clear', verifyToken, async (req, res) => {
+    const userId = req.user.userId;
+
+    try {
+        await pool.query('DELETE FROM user_favorites WHERE user_id = $1', [userId]);
+        res.json({ message: 'Watchlist cleared successfully' });
+    } catch (error) {
+        console.error('Error clearing watchlist:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Route to remove a specific movie from the user's watchlist
+app.delete('/api/favorites/:imdbID', verifyToken, async (req, res) => {
+    const userId = req.user.userId;
+    const { imdbID } = req.params;
+
+    try {
+        const result = await pool.query(
+            'DELETE FROM user_favorites WHERE user_id = $1 AND imdb_id = $2 RETURNING *',
+            [userId, imdbID]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'Movie not found in your watchlist' });
+        }
+
+        res.json({ message: `Movie with imdbID ${imdbID} removed from your watchlist` });
+    } catch (error) {
+        console.error('Error removing movie from watchlist:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
+// Add or change like/dislike vote, or remove vote if clicking the same action
+app.post('/api/movies/:id/like', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    const { action } = req.body; // 'like' or 'dislike'
+    const userId = req.user.userId;
+    const score = action === 'like' ? 10 : 1;
+
+    try {
+        const existingVote = await pool.query('SELECT * FROM likes WHERE user_id = $1 AND movie_id = $2', [userId, id]);
+
+        if (existingVote.rows.length > 0) {
+            const currentScore = existingVote.rows[0].score;
+            if ((currentScore === 10 && action === 'like') || (currentScore === 1 && action === 'dislike')) {
+                // Remove vote
+                await pool.query('DELETE FROM likes WHERE user_id = $1 AND movie_id = $2', [userId, id]);
+                await pool.query('UPDATE movie_votes SET total_score = total_score - $1, total_votes = total_votes - 1 WHERE movie_id = $2', [currentScore, id]);
+                return res.json({ message: 'Vote removed successfully' });
+            } else {
+                // Update vote
+                await pool.query('UPDATE likes SET score = $1 WHERE user_id = $2 AND movie_id = $3', [score, userId, id]);
+                await pool.query('UPDATE movie_votes SET total_score = total_score + $1 - $2 WHERE movie_id = $3', [score, currentScore, id]);
+                return res.json({ message: 'Vote updated successfully' });
+            }
+        } else {
+            // Insert new vote
+            await pool.query('INSERT INTO likes (user_id, movie_id, score) VALUES ($1, $2, $3)', [userId, id, score]);
+            await pool.query('INSERT INTO movie_votes (movie_id, total_score, total_votes) VALUES ($1, $2, 1) ON CONFLICT (movie_id) DO UPDATE SET total_score = movie_votes.total_score + $2, total_votes = movie_votes.total_votes + 1', [id, score]);
+            return res.json({ message: 'Vote recorded successfully' });
+        }
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Error voting for the movie' });
+    }
+});
+
+
+
+
+// Get the current user's vote for a movie
+app.get('/api/movies/:id/uservote', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    try {
+        const result = await pool.query('SELECT score FROM likes WHERE user_id = $1 AND movie_id = $2', [userId, id]);
+
+        if (result.rows.length > 0) {
+            const userVote = result.rows[0].score === 10 ? 'like' : 'dislike';
+            return res.json({ userVote });
+        } else {
+            return res.json({ userVote: null }); // User hasn't voted yet
+        }
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Error fetching user vote' });
+    }
+});
+
+
+
+// Get movie likes/dislikes summary
+app.get('/api/movies/:id/ratings', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await pool.query('SELECT total_score, total_votes FROM movie_votes WHERE movie_id = $1', [id]);
+        if (result.rows.length > 0) {
+            const { total_score, total_votes } = result.rows[0];
+            res.json({ totalScore: total_score, totalVotes: total_votes });
+        } else {
+            res.json({ totalScore: 0, totalVotes: 0 });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error fetching movie ratings' });
+    }
+});
+
+
+
+
+
+
+
+
+// Posting a Comment with Cooldown (1 min)
+app.post('/api/movies/:id/comment', verifyToken, async (req, res) => {
+    const { id } = req.params; // Movie ID
+    const { content } = req.body; // Comment content
+    const userId = req.user.userId;
+    const cooldownMinutes = 1;
+
+    try {
+        // Check if the user has posted within the last minute
+        const recentComment = await pool.query(
+            'SELECT created_at FROM comments WHERE user_id = $1 AND movie_id = $2 ORDER BY created_at DESC LIMIT 1',
+            [userId, id]
+        );
+
+        if (recentComment.rows.length > 0) {
+            const lastCommentTime = new Date(recentComment.rows[0].created_at);
+            const now = new Date();
+            const timeDiff = (now - lastCommentTime) / 1000 / 60; // Difference in minutes
+
+            if (timeDiff < cooldownMinutes) {
+                return res.status(429).json({ message: `Please wait ${Math.ceil(cooldownMinutes - timeDiff)} minute(s) before commenting again.` });
+            }
+        }
+
+        // Insert the new comment
+        await pool.query(
+            'INSERT INTO comments (user_id, movie_id, content) VALUES ($1, $2, $3)',
+            [userId, id, content]
+        );
+
+        return res.json({ message: 'Comment posted successfully.' });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Error posting comment' });
+    }
+});
+
+// Deleting a Comment (only for the comment owner):
+
+app.delete('/api/comments/:commentId', verifyToken, async (req, res) => {
+    const { commentId } = req.params;
+    const userId = req.user.userId;
+
+    try {
+        const comment = await pool.query('SELECT * FROM comments WHERE id = $1', [commentId]);
+
+        if (comment.rows.length === 0) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
+
+        if (comment.rows[0].user_id !== userId) {
+            return res.status(403).json({ message: 'You are not allowed to delete this comment.' });
+        }
+
+        await pool.query('DELETE FROM comments WHERE id = $1', [commentId]);
+        return res.json({ message: 'Comment deleted successfully.' });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Error deleting comment' });
+    }
+});
+
+// Upvoting/Downvoting Comments:
+
+app.post('/api/comments/:commentId/vote', verifyToken, async (req, res) => {
+    const { commentId } = req.params;
+    const { action } = req.body; // 'upvote' or 'downvote'
+    const userId = req.user.userId;
+
+    try {
+        const existingVote = await pool.query(
+            'SELECT * FROM comment_votes WHERE user_id = $1 AND comment_id = $2',
+            [userId, commentId]
+        );
+
+        if (existingVote.rows.length > 0) {
+            const currentVote = existingVote.rows[0].vote_type;
+
+            if (currentVote === action) {
+                // Remove vote
+                await pool.query('DELETE FROM comment_votes WHERE user_id = $1 AND comment_id = $2', [userId, commentId]);
+                return res.json({ message: 'Vote removed successfully' });
+            } else {
+                // Update vote
+                await pool.query('UPDATE comment_votes SET vote_type = $1 WHERE user_id = $2 AND comment_id = $3', [action, userId, commentId]);
+                return res.json({ message: 'Vote updated successfully' });
+            }
+        } else {
+            // Insert new vote
+            await pool.query('INSERT INTO comment_votes (user_id, comment_id, vote_type) VALUES ($1, $2, $3)', [userId, commentId, action]);
+            return res.json({ message: 'Vote recorded successfully' });
+        }
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Error voting for comment' });
+    }
+});
+
+
+// Fetching Comments for a Movie:
+app.get('/api/movies/:id/comments', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const comments = await pool.query(
+            'SELECT comments.id, comments.content, comments.created_at, comments.updated_at, users.username, COALESCE(SUM(CASE WHEN comment_votes.vote_type = \'upvote\' THEN 1 WHEN comment_votes.vote_type = \'downvote\' THEN -1 ELSE 0 END), 0) AS vote_count FROM comments LEFT JOIN users ON comments.user_id = users.id LEFT JOIN comment_votes ON comments.id = comment_votes.comment_id WHERE comments.movie_id = $1 GROUP BY comments.id, users.username',
+            [id]
+        );
+
+        return res.json(comments.rows);
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Error fetching comments' });
+    }
+});
 
 
 const PORT = process.env.PORT || 5000;

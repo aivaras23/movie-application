@@ -9,15 +9,15 @@ type Errors = {
 };
 
 interface Movie {
-    Title: string;
-    Year: string;
+    title: string;
+    year: string;
     imdbID: string;
-    Type: string;
-    Poster: string;
-    Genre: string,
-    Plot: string,
-    Director: string,
-    Actors: string,
+    type: string;
+    poster: string;
+    genre: string,
+    plot: string,
+    director: string,
+    actors: string,
     imdbRating: string
 }
 
@@ -170,20 +170,43 @@ export default function EditAccount() {
         }
     };
 
-
+        // Fetch user's favorite movies from the database
     useEffect(() => {
-    const storedFavorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-    setWatchlist(storedFavorites);
-  }, []);
+        const fetchFavorites = async () => {
+            try {
+                const response = await axios.get(`${baseUrl}/api/favorites`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                });
+                setWatchlist(response.data.favorites); // Assuming response.data.favorites is an array of movies
+            } catch (error) {
+                console.error('Error fetching favorites:', error);
+            }
+        };
 
-  const handleClearWatchlist = () => {
-    localStorage.removeItem('favorites');
-    setWatchlist([]);
-  };
-  
-  const handleRemoveFromWatchlist = (imdbID: string) => {
-  setWatchlist((prevWatchlist) => prevWatchlist.filter((movie) => movie.imdbID !== imdbID));
-};
+        fetchFavorites();
+    }, []);
+
+    const handleClearWatchlist = async () => {
+        try {
+            await axios.delete(`${baseUrl}/api/favorites/clear`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+            });
+            setWatchlist([]); // Clear watchlist on the front-end
+        } catch (error) {
+            console.error('Error clearing watchlist:', error);
+        }
+    };
+
+    const handleRemoveFromWatchlist = async (imdbID: string) => {
+        try {
+            await axios.delete(`${baseUrl}/api/favorites/${imdbID}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+            });
+            setWatchlist((prevWatchlist) => prevWatchlist.filter((movie) => movie.imdbID !== imdbID));
+        } catch (error) {
+            console.error('Error removing movie from watchlist:', error);
+        }
+    };
 
     return (
         <div className="max-w-lg mx-auto mt-10 p-6 bg-white rounded-lg shadow-lg">
@@ -335,12 +358,14 @@ export default function EditAccount() {
                     {watchlist.length === 0 ? (
                     <p className="text-gray-600">Your watchlist is empty.</p>
                     ) : (
+                    <>
+                    {console.log(watchlist)}
                     <ul className="space-y-4">
                         {watchlist.map((movie) => (
                         <li key={movie.imdbID} className="flex justify-between items-center bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-lg shadow-md">
                             <div className="flex items-center space-x-4">
-                            <img src={movie.Poster} alt={movie.Title} width="50" className="rounded" />
-                            <span className="text-white font-semibold">{movie.Title}</span>
+                            <img src={movie.poster} alt={movie.title} width="50" className="rounded" />
+                            <span className="text-white font-semibold">{movie.title}</span>
                             </div>
                             <button
                             onClick={() => handleRemoveFromWatchlist(movie.imdbID)}
@@ -351,6 +376,7 @@ export default function EditAccount() {
                         </li>
                         ))}
                     </ul>
+                    </>
                     )}
                     <div className="mt-4 flex justify-between">
                     <button
