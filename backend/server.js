@@ -147,7 +147,8 @@ app.post('/api/login', async (req, res) => {
             token,
             userId: user.rows[0].id,
             username: user.rows[0].username,
-            email: user.rows[0].email
+            email: user.rows[0].email,
+            avatar: user.rows[0].avatar
         });
 
     } catch (err) {
@@ -302,7 +303,7 @@ const getAllMovies = async (req, res) => {
         // Default search queries: harry potter, batman, superman, evil dead
         const searchQueries = req.query.search
             ? [req.query.search]
-            : ['harry potter', 'superman', 'avengers', 'evil dead'];
+            : ['harry potter', 'superman', 'avengers'];
 
         let allMovies = [];
 
@@ -312,7 +313,7 @@ const getAllMovies = async (req, res) => {
 
             if (response.data.Response === "True") {
                 const movieDetails = await Promise.all(
-                    response.data.Search.slice(0, 5).map(async (movie) => { // Limit to 5 results per query
+                    response.data.Search.slice(0, 10).map(async (movie) => { // Limit to 10 results per query
                         const detailedResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdbID}&apikey=${apiKey}`);
                         return detailedResponse.data; // Return detailed movie data
                     })
@@ -502,12 +503,13 @@ app.get('/api/movies/:id/ratings', async (req, res) => {
 
 
 
-// Posting a Comment with Cooldown (1 min)
+// Backend: Posting a Comment with Cooldown (1 min)
 app.post('/api/movies/:id/comment', verifyToken, async (req, res) => {
     const { id } = req.params; // Movie ID
     const { content } = req.body; // Comment content
     const userId = req.user.userId;
     const cooldownMinutes = 1;
+    console.log(userId)
 
     try {
         // Check if the user has posted within the last minute
@@ -519,23 +521,51 @@ app.post('/api/movies/:id/comment', verifyToken, async (req, res) => {
         if (recentComment.rows.length > 0) {
             const lastCommentTime = new Date(recentComment.rows[0].created_at);
             const now = new Date();
-            const timeDiff = (now - lastCommentTime) / 1000 / 60; // Difference in minutes
+            const timeDiff = (now - lastCommentTime) / 60 / 60; // Difference in minutes
 
             if (timeDiff < cooldownMinutes) {
                 return res.status(429).json({ message: `Please wait ${Math.ceil(cooldownMinutes - timeDiff)} minute(s) before commenting again.` });
             }
         }
 
-        // Insert the new comment
-        await pool.query(
-            'INSERT INTO comments (user_id, movie_id, content) VALUES ($1, $2, $3)',
+        // Insert the new comment and return the newly inserted comment
+        const newComment = await pool.query(
+            'INSERT INTO comments (user_id, movie_id, content) VALUES ($1, $2, $3) RETURNING id, content, created_at',
             [userId, id, content]
         );
 
-        return res.json({ message: 'Comment posted successfully.' });
+        return res.json({
+            ...newComment.rows[0],
+            userId: userId
+        }); // Return the new comment details
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: 'Error posting comment' });
+    }
+});
+
+// Updating a Comment (only for the comment owner):
+
+app.put('/api/comments/:commentId', verifyToken, async (req, res) => {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.userId;
+
+    try {
+        const comment = await pool.query('SELECT * FROM comments WHERE id = $1', [commentId]);
+        if (comment.rows.length === 0) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
+
+        if (comment.rows[0].user_id !== userId) {
+            return res.status(403).json({ message: 'You are not allowed to edit this comment.' });
+        }
+
+        await pool.query('UPDATE comments SET content = $1 WHERE id = $2', [content, commentId]);
+        return res.json({ message: 'Comment updated successfully.' });
+    } catch (err) {
+        console.error('Error updating comment:', err);
+        return res.status(500).json({ message: 'Error updating comment' });
     }
 });
 
@@ -547,7 +577,6 @@ app.delete('/api/comments/:commentId', verifyToken, async (req, res) => {
 
     try {
         const comment = await pool.query('SELECT * FROM comments WHERE id = $1', [commentId]);
-
         if (comment.rows.length === 0) {
             return res.status(404).json({ message: 'Comment not found' });
         }
@@ -568,7 +597,7 @@ app.delete('/api/comments/:commentId', verifyToken, async (req, res) => {
 
 app.post('/api/comments/:commentId/vote', verifyToken, async (req, res) => {
     const { commentId } = req.params;
-    const { action } = req.body; // 'upvote' or 'downvote'
+    const { action } = req.body;
     const userId = req.user.userId;
 
     try {
@@ -577,28 +606,37 @@ app.post('/api/comments/:commentId/vote', verifyToken, async (req, res) => {
             [userId, commentId]
         );
 
+        console.log('Existing Vote:', existingVote.rows); // Debug existing vote
+
         if (existingVote.rows.length > 0) {
             const currentVote = existingVote.rows[0].vote_type;
 
-            if (currentVote === action) {
+            if (currentVote === action.replace('remove-', '')) {
                 // Remove vote
                 await pool.query('DELETE FROM comment_votes WHERE user_id = $1 AND comment_id = $2', [userId, commentId]);
                 return res.json({ message: 'Vote removed successfully' });
             } else {
                 // Update vote
-                await pool.query('UPDATE comment_votes SET vote_type = $1 WHERE user_id = $2 AND comment_id = $3', [action, userId, commentId]);
+                await pool.query(
+                    'UPDATE comment_votes SET vote_type = $1 WHERE user_id = $2 AND comment_id = $3',
+                    [action.replace('switch-to-', ''), userId, commentId]
+                );
                 return res.json({ message: 'Vote updated successfully' });
             }
         } else {
             // Insert new vote
-            await pool.query('INSERT INTO comment_votes (user_id, comment_id, vote_type) VALUES ($1, $2, $3)', [userId, commentId, action]);
+            await pool.query(
+                'INSERT INTO comment_votes (user_id, comment_id, vote_type) VALUES ($1, $2, $3)',
+                [userId, commentId, action.replace('switch-to-', '')]
+            );
             return res.json({ message: 'Vote recorded successfully' });
         }
     } catch (err) {
-        console.error(err);
+        console.error('Error processing vote:', err); // More specific error logging
         return res.status(500).json({ message: 'Error voting for comment' });
     }
 });
+
 
 
 // Fetching Comments for a Movie:
@@ -606,10 +644,23 @@ app.get('/api/movies/:id/comments', async (req, res) => {
     const { id } = req.params;
 
     try {
-        const comments = await pool.query(
-            'SELECT comments.id, comments.content, comments.created_at, comments.updated_at, users.username, COALESCE(SUM(CASE WHEN comment_votes.vote_type = \'upvote\' THEN 1 WHEN comment_votes.vote_type = \'downvote\' THEN -1 ELSE 0 END), 0) AS vote_count FROM comments LEFT JOIN users ON comments.user_id = users.id LEFT JOIN comment_votes ON comments.id = comment_votes.comment_id WHERE comments.movie_id = $1 GROUP BY comments.id, users.username',
-            [id]
-        );
+        const comments = await pool.query(`
+  SELECT 
+    comments.id, 
+    comments.content, 
+    comments.created_at, 
+    comments.updated_at, 
+    users.username,
+    users.avatar,
+    comments.user_id, 
+    COALESCE(SUM(CASE WHEN comment_votes.vote_type = 'upvote' THEN 1 ELSE 0 END), 0) AS upvotes,
+    COALESCE(SUM(CASE WHEN comment_votes.vote_type = 'downvote' THEN 1 ELSE 0 END), 0) AS downvotes
+  FROM comments 
+  LEFT JOIN users ON comments.user_id = users.id 
+  LEFT JOIN comment_votes ON comments.id = comment_votes.comment_id 
+  WHERE comments.movie_id = $1 
+  GROUP BY comments.id, users.username, users.avatar, comments.user_id
+`, [id]);
 
         return res.json(comments.rows);
     } catch (err) {

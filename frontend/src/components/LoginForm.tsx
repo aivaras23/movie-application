@@ -25,6 +25,7 @@ export default function LoginForm() {
         localStorage.setItem('userId', response.data.userId)
         localStorage.setItem('username', response.data.username)
         localStorage.setItem('email', response.data.email)
+        localStorage.setItem('avatar', response.data.avatar)
         navigate('/home')
       }
     } catch (err: unknown) {

@@ -29,14 +29,13 @@ export default function Home() {
 
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null); // hold selected movie data
 
-
     useEffect(() => {
-    // Set login status based on whether a token exists and user is not a guest
-    const token = localStorage.getItem('token');
-    const guest = localStorage.getItem('guest');
-    if (token || guest === 'false') {
-      setIsLogged(true);
-    }
+      // Set login status based on whether a token exists and user is not a guest
+      const token = localStorage.getItem('token');
+      const guest = localStorage.getItem('guest');
+      if (token || guest === 'false') {
+        setIsLogged(true);
+      }
   }, []);
 
   const toggleShowMore = (imdbID: string) => {
@@ -119,6 +118,7 @@ export default function Home() {
               localStorage.removeItem('userId');
               localStorage.removeItem('username');
               localStorage.removeItem('email');
+              localStorage.removeItem('avatar');
               localStorage.removeItem('guest'); // Also remove guest status
               window.location.href = '/login';
             }}
@@ -163,9 +163,9 @@ export default function Home() {
         onChange={(e) => setSearchTerm(e.target.value)}
         className="bg-indigo-600 text-white px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full md:w-auto"
     >
-        <option value="">All</option>
-        <option value="Movies">Movies</option>
-        <option value="TV Shows">TV Shows</option>
+        <option value="">Select Year</option>
+        <option value="2024">2024</option>
+        <option value="2023">2023</option>
     </select>
 
     <input

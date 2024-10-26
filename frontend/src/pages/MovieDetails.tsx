@@ -254,7 +254,7 @@ useEffect(() => {
                     style={{ width: `${progressBarPercentage}%` }}
                   ></div>
                 </div>
-                <p className="mt-2 text-sm">Average Rating: {totalVotes > 0 ? averageScore : '0.0'} / 10</p>
+                <p className="mt-2 text-sm">Average Rating: {totalVotes > 0 ? averageScore : '0.0'} / 10 <span className='text-xs text-slate-300'>{totalVotes} voted.</span> </p>
             </div>
             <div className="flex flex-col text-sm lg:text-lg w-full lg:w-2/3 space-y-4">
               <div>
