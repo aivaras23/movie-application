@@ -18,7 +18,7 @@ interface CommentSectionProps {
   movieId: string; // Identify which movie's comments are being displayed
 }
 
-const COOLDOWN_SECONDS = 1;
+const COOLDOWN_SECONDS = 60;
 
 export default function CommentSection({ movieId }: CommentSectionProps) {
   const username = localStorage.getItem('username');

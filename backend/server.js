@@ -539,7 +539,7 @@ app.post('/api/movies/:id/comment', verifyToken, async (req, res) => {
         if (recentComment.rows.length > 0) {
             const lastCommentTime = new Date(recentComment.rows[0].created_at);
             const now = new Date();
-            const timeDiff = (now - lastCommentTime) / 60 / 60; // Difference in minutes
+            const timeDiff = (now - lastCommentTime) / 1000 / 60; // Difference in minutes
 
             if (timeDiff < cooldownMinutes) {
                 return res.status(429).json({ message: `Please wait ${Math.ceil(cooldownMinutes - timeDiff)} minute(s) before commenting again.` });
