@@ -159,15 +159,6 @@ export default function Home() {
 </header>
 
 <div className="flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0 items-start md:items-center bg-indigo-100 p-4 rounded-lg shadow-md">
-    <select
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="bg-indigo-600 text-white px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full md:w-auto"
-    >
-        <option value="">Select Year</option>
-        <option value="2024">2024</option>
-        <option value="2023">2023</option>
-    </select>
-
     <input
         type="text"
         placeholder="Search for movies..."
@@ -206,75 +197,88 @@ export default function Home() {
           </div>
 
 
-          <div className="container mx-auto p-4">
-            {loading && <p className="text-center text-indigo-700">Loading movies...</p>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {movies.map((movie) => (
-                <div
-                    key={movie.imdbID}
-                    className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300"
-                  >
-                <img
-                   src={movie.Poster !== "N/A" ? movie.Poster : "https://via.placeholder.com/300x450?text=No+Image+Available"}
-                    alt={movie.Title}
-                  className="w-full h-64 object-cover"
-                   onClick={() => handlePosterClick(movie)}
-                />
-                <div className="p-4 text-white">
-                  <h3 className="text-xl font-semibold mb-2">{movie.Title}</h3>
-                  <p className="text-sm">Year: {movie.Year}</p>
-                  <p className="text-sm">Genre: {movie.Genre}</p>
-                    <div className="relative">
-                      <p className={`text-sm transition-all duration-300 ${expandedMovies[movie.imdbID] ? 'line-clamp-none' : 'line-clamp-2'}`}>
-                        Plot: {movie.Plot}
-                      </p>
-                      <button
-                        onClick={() => toggleShowMore(movie.imdbID)}
-                        className="text-indigo-300 hover:text-indigo-100 mb-2 focus:outline-none"
-                      >
-                      {expandedMovies[movie.imdbID] ? 'Show Less' : 'Read More'}
-                      </button>
-                  </div>
-                  <p className="text-sm">Director: {movie.Director}</p>
-                  <p className="text-sm">Actors: {movie.Actors}</p>
-                  <p className="text-sm">Type: {movie.Type}</p>
-                  <p className="text-sm font-semibold">IMDb Rating: {movie.imdbRating}</p>
-                </div>
-              </div>
-              ))}
+<div className="container mx-auto p-4">
+  {loading && <p className="text-center text-indigo-700">Loading movies...</p>}
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    {movies.map((movie) => (
+      <div
+        key={movie.imdbID}
+        className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300"
+      >
+        <div className="relative group">
+          <img
+            src={movie.Poster !== "N/A" ? movie.Poster : "https://via.placeholder.com/300x450?text=No+Image+Available"}
+            alt={movie.Title}
+            className="w-full h-64 object-cover"
+          />
+          {/* Play Button Overlay */}
+          <div 
+          onClick={() => handlePosterClick(movie)}
+          className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-16 h-16 text-white"
+            >
+              <path d="M8 5v14l11-7z" />
+            </svg>
           </div>
         </div>
+        <div className="p-4 text-white">
+          <h3 className="text-xl font-semibold mb-2">{movie.Title}</h3>
+          <p className="text-sm">Year: {movie.Year}</p>
+          <p className="text-sm">Genre: {movie.Genre}</p>
+          <div className="relative">
+            <p className={`text-sm transition-all duration-300 ${expandedMovies[movie.imdbID] ? 'line-clamp-none' : 'line-clamp-2'}`}>
+              Plot: {movie.Plot}
+            </p>
+            <button
+              onClick={() => toggleShowMore(movie.imdbID)}
+              className="text-indigo-300 hover:text-indigo-100 mb-2 focus:outline-none"
+            >
+              {expandedMovies[movie.imdbID] ? 'Show Less' : 'Read More'}
+            </button>
+          </div>
+          <p className="text-sm">Director: {movie.Director}</p>
+          <p className="text-sm">Actors: {movie.Actors}</p>
+          <p className="text-sm">Type: {movie.Type}</p>
+          <p className="text-sm font-semibold">IMDb Rating: {movie.imdbRating}</p>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
               
-              {selectedMovie && (
-                movies.map((movie) => (
-                <div
-                  key={movie.imdbID}
-                  className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75" onClick={closeModal}>
-                    <div className="relative bg-gradient-to-br from-indigo-200 to-purple-400 p-4 rounded-md">
-                      <button
-                        onClick={closeModal}
-                        className="absolute  w-12 top-0 right-2 m-3 text-3xl text-white bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-full hover:from-indigo-600 hover:to-purple-700 transition-colors duration-300 shadow-lg"
-                      >
-                        &times;
-                      </button>
-                      <img
-                        src={selectedMovie.Poster}
-                        alt="Movie Poster"
-                        className="max-w-full max-h-screen"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <div className="flex justify-center space-x-1 mt-4">
-              
-                        <Link to={`/movie/${selectedMovie.imdbID}`}>
-                          <button className="px-6 py-3 text-white bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg font-semibold shadow-md hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 w-64">
-                            View movie
-                          </button>
-                      </Link>
-                      </div>
-                    </div>
-                </div>
-                 ))
-            )}
+{selectedMovie && (
+  <div
+    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75"
+    onClick={closeModal}
+  >
+    <div className="relative bg-gradient-to-br from-indigo-200 to-purple-400 p-4 rounded-md">
+      <button
+        onClick={closeModal}
+        className="absolute w-12 top-0 right-2 m-3 text-3xl text-white bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-full hover:from-indigo-600 hover:to-purple-700 transition-colors duration-300 shadow-lg"
+      >
+        &times;
+      </button>
+      <img
+        src={selectedMovie.Poster}
+        alt="Movie Poster"
+        className="max-w-full max-h-screen"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div className="flex justify-center space-x-1 mt-4">
+        <Link to={`/movie/${selectedMovie.imdbID}`}>
+          <button className="px-6 py-3 text-white bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg font-semibold shadow-md hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 w-64">
+            View movie
+          </button>
+        </Link>
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
     

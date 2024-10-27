@@ -238,13 +238,19 @@ app.get('/api/edit-account', verifyToken, async (req, res) => {
 app.put('/api/edit-account', verifyToken, upload.single('avatar'), async (req, res) => {
     const userId = req.user.userId;
     const { username, email, currentPassword, newPassword } = req.body;
-    const avatar = req.file ? `/uploads/avatars/${req.file.filename}` : null; // Avatar file path
+    const avatar = req.file ? `/uploads/avatars/${req.file.filename}` : null;
 
     try {
         // Fetch the user by ID from the database
         const userQuery = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
         if (userQuery.rows.length === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Check if the username already exists (excluding the current user)
+        const existingUsername = await pool.query('SELECT * FROM users WHERE username = $1 AND id != $2', [username, userId]);
+        if (existingUsername.rows.length > 0) {
+            return res.status(409).json({ success: false, message: 'Username is already taken' });
         }
 
         const dbPassword = userQuery.rows[0].password;
@@ -256,12 +262,11 @@ app.put('/api/edit-account', verifyToken, upload.single('avatar'), async (req, r
         }
 
         // Update password if a new one is provided
-        let updatedPassword = dbPassword;  // Default to the current password if no new password is provided
+        let updatedPassword = dbPassword;
         if (newPassword) {
             updatedPassword = await bcrypt.hash(newPassword, 10);
         }
 
-        // Update user information in the database
         await pool.query(
             'UPDATE users SET username = $1, email = $2, password = $3, avatar = $4 WHERE id = $5',
             [username || userQuery.rows[0].username, email || userQuery.rows[0].email, updatedPassword, avatar, userId]
@@ -273,6 +278,7 @@ app.put('/api/edit-account', verifyToken, upload.single('avatar'), async (req, r
         res.status(500).json({ success: false, message: 'Error updating account' });
     }
 });
+
 
 app.get('/api/movie/:imdbID', async (req, res) => {
     const { imdbID } = req.params;
@@ -303,28 +309,42 @@ const getAllMovies = async (req, res) => {
         // Default search queries: harry potter, batman, superman, evil dead
         const searchQueries = req.query.search
             ? [req.query.search]
-            : ['harry potter', 'superman', 'avengers'];
+            : ['harry potter', 'superman', 'evil dead'];
 
         let allMovies = [];
 
-        // Loop through each query and get 5 movies
+        // Loop through each query
         for (const query of searchQueries) {
-            const response = await axios.get(`http://www.omdbapi.com/?s=${query}&apikey=${apiKey}`);
+            let movies = [];
+            let page = 1;
 
-            if (response.data.Response === "True") {
-                const movieDetails = await Promise.all(
-                    response.data.Search.slice(0, 10).map(async (movie) => { // Limit to 10 results per query
-                        const detailedResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdbID}&apikey=${apiKey}`);
-                        return detailedResponse.data; // Return detailed movie data
-                    })
-                );
-                allMovies = allMovies.concat(movieDetails); // Combine the movies
-            } else {
-                console.error(`Error fetching movies for query "${query}": ${response.data.Error}`);
+            // Fetch up to 30 movies in batches of 10
+            while (movies.length < 30) {
+                const response = await axios.get(`http://www.omdbapi.com/?s=${query}&page=${page}&apikey=${apiKey}`);
+
+                if (response.data.Response === "True") {
+                    movies = movies.concat(response.data.Search);
+
+                    // Break if we’ve reached fewer than 10 results on the current page
+                    if (response.data.Search.length < 10) break;
+                } else {
+                    console.error(`Error fetching movies for query "${query}": ${response.data.Error}`);
+                    break;
+                }
+                page++;
             }
+
+            // Slice results based on the range of 10-30 results
+            const movieDetails = await Promise.all(
+                movies.slice(0, Math.max(10, Math.min(movies.length, 30))).map(async (movie) => {
+                    const detailedResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdbID}&apikey=${apiKey}`);
+                    return detailedResponse.data;
+                })
+            );
+
+            allMovies = allMovies.concat(movieDetails);
         }
 
-        // Check if any movies were found
         if (allMovies.length > 0) {
             res.status(200).json(allMovies);
         } else {
@@ -335,8 +355,6 @@ const getAllMovies = async (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 };
-
-
 
 // Route for fetching movies
 app.get('/api/home', getAllMovies);

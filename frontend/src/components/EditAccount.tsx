@@ -120,55 +120,54 @@ export default function EditAccount() {
         }
     };
 
-    const handleSaveChanges = async () => {
-        if (!validateInputs()) return;
+const handleSaveChanges = async () => {
+    if (!validateInputs()) return;
 
-        try {
-            // Use FormData to handle file uploads and regular form data
-            const formData = new FormData();
+    try {
+        const formData = new FormData();
+        formData.append('username', userData.username);
+        formData.append('email', userData.email);
+        formData.append('currentPassword', currentPassword);
+        if (newPassword) formData.append('newPassword', newPassword);
 
-            // Append the standard form data
-            formData.append('username', userData.username);
-            formData.append('email', userData.email);
-            formData.append('currentPassword', currentPassword);
-            if (newPassword) formData.append('newPassword', newPassword);
+        if (avatarFile) {
+            formData.append('avatar', avatarFile);
+        }
 
-            // If the user uploaded a new avatar, append the file
-            if (avatarFile) {
-                formData.append('avatar', avatarFile);
-            }
+        const response = await axios.put(`${baseUrl}/api/edit-account`, formData, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'multipart/form-data',
+            },
+        });
 
-            console.log('Sending update request with formData');
+        setOriginalUserData({
+            username: userData.username,
+            email: userData.email,
+            avatar: avatarPreview,
+        });
 
-            const response = await axios.put(`${baseUrl}/api/edit-account`, formData, {
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'multipart/form-data', // Important for file uploads
-                },
-            });
+        console.log(response.data.message);
 
-            
-            // Update originalUserData with the new values after successful update
-            setOriginalUserData({
-                username: userData.username,
-                email: userData.email,
-                avatar: avatarPreview,
-            });
-
-
-            console.log(response.data.message);
-
-            localStorage.setItem('username', userData.username);
-            setShowModal(true); // Show the modal on successful update
-            setIsEditing(false);
-        } catch (err) {
-            console.error(err);
+        localStorage.setItem('username', userData.username);
+        setShowModal(true);
+        setIsEditing(false);
+    } catch (err:any) {
+        console.error(err);
+        if (err.response && err.response.status === 409) {
+            setErrors((prev) => ({
+                ...prev,
+                username: 'Username is already taken',
+            }));
+        } else {
             setErrors((prev) => ({
                 ...prev,
                 currentPassword: 'Incorrect current password',
             }));
         }
-    };
+    }
+};
+
 
         // Fetch user's favorite movies from the database
     useEffect(() => {
