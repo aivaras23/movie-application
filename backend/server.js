@@ -663,22 +663,22 @@ app.get('/api/movies/:id/comments', async (req, res) => {
 
     try {
         const comments = await pool.query(`
-  SELECT 
-    comments.id, 
-    comments.content, 
-    comments.created_at, 
-    comments.updated_at, 
-    users.username,
-    users.avatar,
-    comments.user_id, 
-    COALESCE(SUM(CASE WHEN comment_votes.vote_type = 'upvote' THEN 1 ELSE 0 END), 0) AS upvotes,
-    COALESCE(SUM(CASE WHEN comment_votes.vote_type = 'downvote' THEN 1 ELSE 0 END), 0) AS downvotes
-  FROM comments 
-  LEFT JOIN users ON comments.user_id = users.id 
-  LEFT JOIN comment_votes ON comments.id = comment_votes.comment_id 
-  WHERE comments.movie_id = $1 
-  GROUP BY comments.id, users.username, users.avatar, comments.user_id
-`, [id]);
+    SELECT 
+        comments.id, 
+        comments.content, 
+        comments.created_at, 
+        comments.updated_at, 
+        users.username,
+        users.avatar,
+        comments.user_id, 
+        COALESCE(SUM(CASE WHEN comment_votes.vote_type = 'upvote' THEN 1 ELSE 0 END), 0) AS upvotes,
+        COALESCE(SUM(CASE WHEN comment_votes.vote_type = 'downvote' THEN 1 ELSE 0 END), 0) AS downvotes
+    FROM comments 
+    LEFT JOIN users ON comments.user_id = users.id 
+    LEFT JOIN comment_votes ON comments.id = comment_votes.comment_id 
+    WHERE comments.movie_id = $1 
+    GROUP BY comments.id, users.username, users.avatar, comments.user_id
+    `, [id]);
 
         return res.json(comments.rows);
     } catch (err) {
