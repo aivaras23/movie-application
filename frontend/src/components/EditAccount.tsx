@@ -327,7 +327,9 @@ const handleSaveChanges = async () => {
                     </div>
                 ) : (
                     <button
-                        onClick={() => setIsEditing(true)}
+                        onClick={() => {setIsEditing(true);
+                        setShowWatchlist(false)
+                        }}
                         className="w-full py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-200"
                     >
                         Edit Account
