@@ -88,7 +88,7 @@ This is a full-stack movie application designed to provide a seamless movie expl
          is_verified BOOLEAN,
          verification_token VARCHAR(255),
          avatar TEXT
-         )
+         );
 
          CREATE TABLE user_favorites (
          id SERIAL PRIMARY KEY,
@@ -124,7 +124,6 @@ This is a full-stack movie application designed to provide a seamless movie expl
          UNIQUE(user_id, movie_id, content)
          );
 
-         -- Table for comment upvotes/downvotes
          CREATE TABLE comment_votes (
          id SERIAL PRIMARY KEY,
          user_id INT REFERENCES users(id) ON DELETE CASCADE,
