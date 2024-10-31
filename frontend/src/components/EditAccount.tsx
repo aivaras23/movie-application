@@ -42,6 +42,7 @@ export default function EditAccount() {
     const [avatarPreview, setAvatarPreview] = useState(''); // Preview of the avatar
     const [showWatchList, setShowWatchlist] = useState(false);
     const [watchlist, setWatchlist] = useState<Movie[]>([]);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     useEffect(() => {
         // Fetch current user details
@@ -165,6 +166,30 @@ const handleSaveChanges = async () => {
                 currentPassword: 'Incorrect current password',
             }));
         }
+    }
+};
+
+const deleteAccount = async () => {
+    try {
+        const response = await axios.delete(`${baseUrl}/api/delete-account`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+        });
+
+        console.log(response.data.message);
+
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        localStorage.removeItem('avatar');
+        localStorage.removeItem('email');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('lastPostTime');
+        
+        setShowDeleteModal(true);
+    } catch (err: any) {
+        console.error('Error deleting account:', err);
+        alert('There was an issue deleting your account. Please try again.');
     }
 };
 
@@ -316,6 +341,12 @@ const handleSaveChanges = async () => {
                             Save Changes
                         </button>
                         <button
+                            onClick={deleteAccount}
+                            className="py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-200"
+                        >
+                            Delete Account
+                        </button>
+                        <button
                                 onClick={() => {
                                 setIsEditing(false);
                                 cancelChanges();
@@ -347,11 +378,29 @@ const handleSaveChanges = async () => {
                             onClick={() => setShowModal(false)}
                             className="mt-4 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                         >
-                            Close
+                            Okay
                         </button>
                     </div>
                 </div>
             )}
+
+            {showDeleteModal && (
+                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                        <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full text-center">
+                            <h2 className="text-2xl font-semibold mb-4">Account Deleted</h2>
+                            <p>Your account was successfully deleted.</p>
+                            <button
+                                onClick={() => {
+                                    setShowDeleteModal(false);
+                                    window.location.href = '/login'; // Redirect after modal is closed
+                                }}
+                                className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
+                            >
+                                Okay
+                            </button>
+                        </div>
+                    </div>
+                )}
 
             {showWatchList && (
                 <div className="bg-white rounded-lg p-6 shadow-lg max-w-md mx-auto">

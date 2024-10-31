@@ -280,6 +280,26 @@ app.put('/api/edit-account', verifyToken, upload.single('avatar'), async (req, r
 });
 
 
+// Delete account route
+app.delete('/api/delete-account', verifyToken, async (req, res) => {
+    const userId = req.user.userId;
+
+    try {
+        // Delete the user from the database
+        const deleteResult = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+
+        if (deleteResult.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        res.json({ success: true, message: 'Account deleted successfully' });
+    } catch (err) {
+        console.error('Error deleting account:', err);
+        res.status(500).json({ success: false, message: 'Error deleting account' });
+    }
+});
+
+
 app.get('/api/movie/:imdbID', async (req, res) => {
     const { imdbID } = req.params;
     const apiKey = process.env.OMDB_API_KEY;
