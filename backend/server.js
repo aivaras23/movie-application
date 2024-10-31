@@ -635,45 +635,50 @@ app.delete('/api/comments/:commentId', verifyToken, async (req, res) => {
 
 app.post('/api/comments/:commentId/vote', verifyToken, async (req, res) => {
     const { commentId } = req.params;
-    const { action } = req.body;
+    const { action } = req.body; // 'upvote' or 'downvote'
     const userId = req.user.userId;
+    const score = action === 'upvote' ? 1 : -1;
 
     try {
+        // Check if the user already voted on this comment
         const existingVote = await pool.query(
             'SELECT * FROM comment_votes WHERE user_id = $1 AND comment_id = $2',
             [userId, commentId]
         );
 
-        console.log('Existing Vote:', existingVote.rows); // Debug existing vote
-
         if (existingVote.rows.length > 0) {
-            const currentVote = existingVote.rows[0].vote_type;
+            const currentVoteType = existingVote.rows[0].vote_type;
 
-            if (currentVote === action.replace('remove-', '')) {
-                // Remove vote
-                await pool.query('DELETE FROM comment_votes WHERE user_id = $1 AND comment_id = $2', [userId, commentId]);
+            if (currentVoteType === action) {
+                // Remove the vote if the user clicks the same action again
+                await pool.query(
+                    'DELETE FROM comment_votes WHERE user_id = $1 AND comment_id = $2',
+                    [userId, commentId]
+                );
                 return res.json({ message: 'Vote removed successfully' });
             } else {
-                // Update vote
+                // Update the vote type and score if the user switches vote type
                 await pool.query(
-                    'UPDATE comment_votes SET vote_type = $1 WHERE user_id = $2 AND comment_id = $3',
-                    [action.replace('switch-to-', ''), userId, commentId]
+                    'UPDATE comment_votes SET vote_type = $1, score = $2 WHERE user_id = $3 AND comment_id = $4',
+                    [action, score, userId, commentId]
                 );
                 return res.json({ message: 'Vote updated successfully' });
             }
         } else {
-            // Insert new vote
+            // Insert a new vote if none exists
             await pool.query(
-                'INSERT INTO comment_votes (user_id, comment_id, vote_type) VALUES ($1, $2, $3)',
-                [userId, commentId, action.replace('switch-to-', '')]
+                'INSERT INTO comment_votes (user_id, comment_id, vote_type, score) VALUES ($1, $2, $3, $4)',
+                [userId, commentId, action, score]
             );
             return res.json({ message: 'Vote recorded successfully' });
         }
     } catch (err) {
-        console.error('Error processing vote:', err); // More specific error logging
+        console.error('Error processing vote:', err);
         return res.status(500).json({ message: 'Error voting for comment' });
     }
 });
+
+
 
 
 

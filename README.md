@@ -128,6 +128,7 @@ This is a full-stack movie application designed to provide a seamless movie expl
          id SERIAL PRIMARY KEY,
          user_id INT REFERENCES users(id) ON DELETE CASCADE,
          comment_id INT REFERENCES comments(id) ON DELETE CASCADE,
+         score INT NOT NULL
          vote_type VARCHAR(10) CHECK (vote_type IN ('upvote', 'downvote')),
          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
          UNIQUE(user_id, comment_id)

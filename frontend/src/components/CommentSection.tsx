@@ -113,41 +113,34 @@ const handleVote = async (id: number, type: 'upvote' | 'downvote') => {
   const currentComment = comments.find((comment) => comment.id === id);
   if (!currentComment) return;
 
-  let action = '';
-  if (type === 'upvote') {
-    action = currentComment.userUpvoted ? 'remove-upvote' : currentComment.userDownvoted ? 'switch-to-upvote' : 'upvote';
-  } else if (type === 'downvote') {
-    action = currentComment.userDownvoted ? 'remove-downvote' : currentComment.userUpvoted ? 'switch-to-downvote' : 'downvote';
-  }
-
   try {
     await axios.post(
       `http://localhost:5000/api/comments/${id}/vote`,
-      { action },
+      { action: type },
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+    // Update state based on action and current user vote
     setComments((comments) =>
       comments.map((comment) => {
         if (comment.id === id) {
-          const updatedUpvotes =
-            action === 'upvote' || action === 'switch-to-upvote'
-              ? Number(comment.upvotes) + 1
-              : action === 'remove-upvote'
+          const updatedUpvotes = type === 'upvote'
+            ? currentComment.userUpvoted
               ? Number(comment.upvotes) - 1
-              : Number(comment.upvotes);
-          const updatedDownvotes =
-            action === 'downvote' || action === 'switch-to-downvote'
+              : Number(comment.upvotes) + 1
+            : Number(comment.upvotes) - (currentComment.userUpvoted ? 1 : 0);
+          const updatedDownvotes = type === 'downvote'
+            ? currentComment.userDownvoted
               ? Number(comment.downvotes) - 1
-              : action === 'remove-downvote'
-              ? Number(comment.downvotes) + 1
-              : Number(comment.downvotes);
+              : Number(comment.downvotes) + 1
+            : Number(comment.downvotes) - (currentComment.userDownvoted ? 1 : 0);
+
           return {
             ...comment,
             upvotes: updatedUpvotes,
             downvotes: updatedDownvotes,
-            userUpvoted: action === 'upvote' || action === 'switch-to-upvote',
-            userDownvoted: action === 'downvote' || action === 'switch-to-downvote',
+            userUpvoted: type === 'upvote' && !currentComment.userUpvoted,
+            userDownvoted: type === 'downvote' && !currentComment.userDownvoted,
           };
         }
         return comment;
@@ -157,6 +150,7 @@ const handleVote = async (id: number, type: 'upvote' | 'downvote') => {
     console.error("Error handling vote:", error);
   }
 };
+
 
 
   // Delete your own comment
